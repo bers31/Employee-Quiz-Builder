@@ -1,0 +1,73 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Jalankan setiap 20 menit
+    - cron: "*/20 * * * *"
+
+  # Bisa dijalankan manual dari GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Streamlit App
+        shell: bash
+        run: |
+          set -u
+
+          URL="https://employee-quiz-builder-kdgdcd9rlvphaws8zspuu9.streamlit.app/"
+
+          MAX_ATTEMPTS=5
+          WAIT_SECONDS=30
+
+          echo "========================================="
+          echo "Streamlit Keep-Alive"
+          echo "========================================="
+          echo "URL: $URL"
+          echo ""
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt/$MAX_ATTEMPTS..."
+
+            HTTP_STATUS=$(curl \
+              --location \
+              --silent \
+              --show-error \
+              --output /dev/null \
+              --write-out "%{http_code}" \
+              --connect-timeout 15 \
+              --max-time 90 \
+              "$URL" || echo "000")
+
+            echo "HTTP Status: $HTTP_STATUS"
+
+            if [[ "$HTTP_STATUS" =~ ^2[0-9][0-9]$ ]] || \
+               [[ "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
+
+              echo ""
+              echo "========================================="
+              echo "SUCCESS"
+              echo "Streamlit app is reachable."
+              echo "HTTP Status: $HTTP_STATUS"
+              echo "========================================="
+
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              echo "App is not ready yet."
+              echo "Waiting ${WAIT_SECONDS} seconds before retry..."
+              sleep "$WAIT_SECONDS"
+            fi
+          done
+
+          echo ""
+          echo "========================================="
+          echo "FAILED"
+          echo "Streamlit app could not be reached."
+          echo "========================================="
+
+          exit 1
