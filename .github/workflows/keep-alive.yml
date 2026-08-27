@@ -3,7 +3,6 @@ name: Keep Streamlit App Alive
 on:
   schedule:
     - cron: "*/20 * * * *"
-
   workflow_dispatch:
 
 jobs:
@@ -27,11 +26,12 @@ jobs:
           echo "URL: $URL"
           echo ""
 
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
 
             echo "Attempt $attempt/$MAX_ATTEMPTS..."
 
             HTTP_STATUS=$(curl \
+              --location \
               --silent \
               --show-error \
               --output /dev/null \
@@ -43,7 +43,7 @@ jobs:
             CURL_EXIT=$?
 
             echo "Curl exit code: $CURL_EXIT"
-            echo "HTTP status: $HTTP_STATUS"
+            echo "Final HTTP status: $HTTP_STATUS"
 
             if [ "$CURL_EXIT" -eq 0 ] && \
                [[ "$HTTP_STATUS" =~ ^2[0-9][0-9]$ ]]; then
@@ -52,20 +52,25 @@ jobs:
               echo "========================================="
               echo "SUCCESS"
               echo "App is reachable."
-              echo "HTTP status: $HTTP_STATUS"
+              echo "Final HTTP status: $HTTP_STATUS"
               echo "========================================="
 
               exit 0
             fi
 
-            if [[ "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
-              echo ""
-              echo "WARNING: App returned a redirect."
-              echo "This may mean the app requires authentication."
+            if [ "$CURL_EXIT" -ne 0 ]; then
+              echo "WARNING: Curl failed to connect to the app."
+            elif [[ "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
+              echo "WARNING: App still returned a redirect."
+            elif [[ "$HTTP_STATUS" =~ ^4[0-9][0-9]$ ]]; then
+              echo "WARNING: App returned a client error."
+            elif [[ "$HTTP_STATUS" =~ ^5[0-9][0-9]$ ]]; then
+              echo "WARNING: App returned a server error."
+            else
+              echo "WARNING: Unexpected response."
             fi
 
             if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-              echo ""
               echo "Retrying in ${WAIT_SECONDS} seconds..."
               sleep "$WAIT_SECONDS"
             fi
@@ -76,6 +81,7 @@ jobs:
           echo "========================================="
           echo "FAILED"
           echo "========================================="
-          echo "The app could not be reached anonymously."
+          echo "The Streamlit app could not be reached."
+          echo "Tried $MAX_ATTEMPTS times."
 
           exit 1
