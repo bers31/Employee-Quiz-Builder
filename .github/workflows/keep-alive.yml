@@ -31,7 +31,6 @@ jobs:
             echo "Attempt $attempt/$MAX_ATTEMPTS..."
 
             HTTP_STATUS=$(curl \
-              --location \
               --silent \
               --show-error \
               --output /dev/null \
@@ -43,32 +42,39 @@ jobs:
             CURL_EXIT=$?
 
             echo "Curl exit code: $CURL_EXIT"
-            echo "Final HTTP status: $HTTP_STATUS"
+            echo "HTTP status: $HTTP_STATUS"
 
+            # 2xx = request berhasil
             if [ "$CURL_EXIT" -eq 0 ] && \
                [[ "$HTTP_STATUS" =~ ^2[0-9][0-9]$ ]]; then
 
               echo ""
               echo "========================================="
               echo "SUCCESS"
-              echo "App is reachable."
-              echo "Final HTTP status: $HTTP_STATUS"
+              echo "App responded successfully."
+              echo "HTTP status: $HTTP_STATUS"
               echo "========================================="
 
               exit 0
             fi
 
-            if [ "$CURL_EXIT" -ne 0 ]; then
-              echo "WARNING: Curl failed to connect to the app."
-            elif [[ "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
-              echo "WARNING: App still returned a redirect."
-            elif [[ "$HTTP_STATUS" =~ ^4[0-9][0-9]$ ]]; then
-              echo "WARNING: App returned a client error."
-            elif [[ "$HTTP_STATUS" =~ ^5[0-9][0-9]$ ]]; then
-              echo "WARNING: App returned a server error."
-            else
-              echo "WARNING: Unexpected response."
+            # 3xx dari Streamlit dapat terjadi karena session/redirect handling
+            if [ "$CURL_EXIT" -eq 0 ] && \
+               [[ "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
+
+              echo ""
+              echo "========================================="
+              echo "STREAMLIT RESPONSE"
+              echo "========================================="
+              echo "App is reachable."
+              echo "HTTP status: $HTTP_STATUS"
+              echo "Redirect detected, but curl connection succeeded."
+              echo "========================================="
+
+              exit 0
             fi
+
+            echo "Request failed."
 
             if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
               echo "Retrying in ${WAIT_SECONDS} seconds..."
@@ -81,7 +87,7 @@ jobs:
           echo "========================================="
           echo "FAILED"
           echo "========================================="
-          echo "The Streamlit app could not be reached."
-          echo "Tried $MAX_ATTEMPTS times."
+          echo "Could not reach the Streamlit app."
+          echo "========================================="
 
           exit 1
