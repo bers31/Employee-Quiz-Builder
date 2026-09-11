@@ -315,7 +315,7 @@ The interactive quiz UI, scoring logic, and feedback display.
 | 🎮 Interactive Quiz | Session-state–driven quiz-taking UI | ✅ Implemented |
 | 🧮 Automatic Scoring | Instant scoring with per-question explanations | ✅ Implemented |
 | 📜 Generation Log | Attempt-by-attempt audit trail | ✅ Implemented |
-| ☁️ Public Deployment | Live demo on Streamlit Community Cloud | <!-- update this row once Phase 15 is confirmed live -->🚧 Confirm before publishing |
+| ☁️ Public Deployment | Live demo on Streamlit Community Cloud | ✅ Implemented |
 
 ---
 
@@ -327,15 +327,19 @@ The interactive quiz UI, scoring logic, and feedback display.
 
 <p><strong>🧠 99 Group AI Property Knowledge Quiz Builder</strong></p>
 
-<!-- TODO: replace with your real Streamlit Community Cloud URL -->
-<p><a href="https://your-app-name.streamlit.app"><strong>► View Live Demo</strong></a></p>
+<p><a href="https://employee-quiz-builder-kdgdcd9rlvphaws8zspuu9.streamlit.app/"><strong>► View Live Demo</strong></a></p>
 
 </div>
 
 ### 📸 Preview
 
-<!-- TODO: add a real screenshot at this path -->
-![Quiz Builder Preview](images/quiz-builder-preview.png)
+![Screenshot 1](images/Picture1.png)
+![Screenshot 2](images/Picture2.png)
+![Screenshot 3](images/Picture3.png)
+![Screenshot 4](images/Picture4.png)
+![Screenshot 5](images/Picture5.png)
+![Screenshot 6](images/Picture6.png)
+![Screenshot 7](images/Picture7.png)
 
 *Topic input, AI-generated quiz, and instant scoring — all in one interactive Streamlit session.*
 
@@ -412,6 +416,35 @@ streamlit run app.py
 | Documentation | Prompt templates and workflow versioned alongside the code, not screenshotted |
 
 > **Portfolio positioning:** this project demonstrates the ability to wrap a non-deterministic model in genuine engineering discipline — not just call an API and hope for the best.
+
+---
+
+### 🧬 Schema-Constrained Generation
+
+Quiz generation uses the Gemini API's `response_schema` parameter
+bound to Pydantic models. This moves the output contract into the
+generation layer, so the application receives a structured response
+that conforms to the defined schema instead of relying on free-form
+LLM text followed by manual JSON parsing.
+
+---
+
+## 🧾 Prompt Engineering & Reproducibility
+
+The repository documents the AI layer as part of the engineering implementation rather than treating prompts as hidden application details.
+
+The public project includes:
+
+* the generation prompt template,
+* the AI quality-review prompt,
+* the expected structured output schema,
+* the reasoning behind the separation between generation and evaluation.
+
+The generation prompt is responsible for producing the quiz.
+
+The review prompt is intentionally separated and used only to evaluate the already-generated quiz against explicit quality criteria.
+
+This separation makes the AI workflow easier to inspect, reproduce, debug, and iterate without coupling content generation directly to its own evaluation.
 
 ---
 
