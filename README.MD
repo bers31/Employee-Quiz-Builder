@@ -2,7 +2,7 @@
 
 <h1>🧠 Property Knowledge Quiz Builder</h1>
 
-<p>AI Quiz Generation · LLM-as-Judge Quality Gate · Interactive Assessment</p>
+<p>AI Quiz Generation · Structured Output · LLM-as-Judge · Interactive Assessment</p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
@@ -10,13 +10,15 @@
   <img src="https://img.shields.io/badge/Google%20Gemini%20API-8B5CF6?style=flat-square&logo=googlegemini&logoColor=white" alt="Google Gemini API"/>
   <img src="https://img.shields.io/badge/Pydantic-E92063?style=flat-square&logo=pydantic&logoColor=white" alt="Pydantic"/>
   <img src="https://img.shields.io/badge/LLM%20Application-6D28D9?style=flat-square" alt="LLM Application"/>
+  <img src="https://img.shields.io/badge/Structured%20Output-7C3AED?style=flat-square" alt="Structured Output"/>
   <img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" alt="MIT License"/>
 </p>
 
 <p>
-An end-to-end AI pipeline that turns a single topic string into a validated,
-schema-conformant multiple-choice quiz — reviewed by a second AI, self-corrected
-on failure, and delivered as an interactive, scored experience.
+An end-to-end AI assessment pipeline that turns a topic, target role,
+difficulty, and language into a structured multiple-choice quiz —
+validated programmatically, reviewed by a second LLM, automatically retried
+when quality gates fail, and delivered as an interactive assessment.
 </p>
 
 </div>
@@ -25,44 +27,76 @@ on failure, and delivered as an interactive, scored experience.
 
 ## 📖 Project Overview
 
-This project is an **AI-powered quiz generation system** built for employee knowledge training at 99 Group, a property industry organization.
+**Property Knowledge Quiz Builder** is an AI-powered assessment application designed to generate property-industry knowledge quizzes for employee learning and training.
 
-Rather than a single "ask an LLM, hope it's right" call, the system treats quiz generation as a **pipeline with independent quality gates** — because a quiz with a broken question, a duplicate, or an unfair distractor is worse than no quiz at all.
+The project was built around a simple observation:
+
+> Generating a quiz is easy. Generating a quiz that is structurally valid, relevant, answerable, and consistent is a different engineering problem.
+
+Instead of relying on a single LLM request, the application treats quiz generation as a **multi-stage quality pipeline**:
 
 ```text
-Topic Input
-     ↓
+User Configuration
+      ↓
 Prompt Construction
-     ↓
-Gemini API (Structured Generation)
-     ↓
+      ↓
+Structured Generation
+      ↓
 Programmatic Validation
-     ↓
-AI Quality Assurance (LLM-as-Judge)
-     ↓
-   Pass? ── No ──→ Retry (up to 3x)
-     │ Yes
-     ↓
+      ↓
+AI Quality Review
+      ↓
+  Pass / Retry
+      ↓
 Interactive Quiz
-     ↓
+      ↓
 Automatic Scoring
-     ↓
-Feedback + Explanations
+      ↓
+Feedback & Explanation
 ```
 
-> **Core philosophy:** an AI feature is only as trustworthy as its worst unreviewed output. This project treats validation and quality review as first-class pipeline stages, not afterthoughts — every quiz a user sees has already survived two independent reviewers before they do.
+The result is an application that uses the LLM for what it does well—content generation and semantic judgment—while deterministic Python code handles structure, validation, orchestration, and application behavior.
+
+> **Core philosophy:** the model generates the content, but the application decides whether that content is acceptable.
 
 ---
 
 ## 🎯 Project Objectives
 
-1. Convert a single topic string into a complete, well-structured multiple-choice quiz without manual authoring.
-2. Guarantee output that is machine-parseable and schema-conformant — not just "AI text that looks like JSON."
-3. Catch structural errors (wrong question count, duplicate questions, malformed options) before a human ever sees them.
-4. Catch semantic errors (irrelevant questions, unfair distractors, inconsistent explanations) using a second AI reviewer, not just a human eyeballing the result.
-5. Recover automatically from failed generations instead of surfacing raw errors to the end user.
-6. Deliver the finished quiz as a usable, interactive experience — not a raw JSON blob — with immediate scoring and explanations.
-7. Keep the entire pipeline runnable at zero cost on free-tier infrastructure.
+### 🧠 Generate Useful Assessment Content
+
+Turn a single topic into a complete multiple-choice assessment without requiring manual question authoring.
+
+### 📦 Enforce Machine-Readable Output
+
+Ensure generated quizzes conform to an explicit schema instead of depending on loosely formatted JSON-like text.
+
+### 🛡️ Detect Structural Problems
+
+Catch issues such as:
+
+* incorrect question count,
+* duplicate questions,
+* empty options,
+* duplicate options,
+* malformed answer structures,
+* inconsistent difficulty configuration.
+
+### 🧑‍⚖️ Review Semantic Quality
+
+Use a second Gemini call to evaluate generated content for problems that deterministic checks cannot reliably detect.
+
+### 🔁 Recover From Failed Generations
+
+Automatically regenerate the quiz when a validation or quality gate fails, rather than exposing malformed content to the end user.
+
+### 🎮 Deliver a Real Assessment Experience
+
+Present the generated content as an interactive quiz with scoring and question-level explanations instead of returning raw model output.
+
+### 💰 Keep the Architecture Cost-Conscious
+
+The project is designed to run using free-tier infrastructure where available, making it practical for experimentation, portfolio demonstration, and lightweight internal training use.
 
 ---
 
@@ -70,155 +104,357 @@ Feedback + Explanations
 
 ### 🧬 Schema-Constrained Generation
 
-Instead of asking the model to "please return JSON," every quiz request is paired with a **Pydantic schema** passed directly to the Gemini API via `response_schema`. Generation is constrained at the API level, and the SDK returns fully-typed Python objects — not a string that might or might not parse.
+The application uses **Pydantic models as the source of truth for quiz structure**.
+
+Instead of asking the LLM to "return JSON", the schema is supplied to the Gemini API through structured output configuration.
+
+```text
+Pydantic Schema
+      ↓
+Gemini response_schema
+      ↓
+Structured Model Response
+      ↓
+Typed Python Object
+```
+
+This moves part of the reliability problem from prompt wording into the application architecture.
+
+---
 
 ### 🛡️ Two-Stage Quality Gate
 
-- **Programmatic validation** — deterministic, zero-cost checks: question count, duplicate detection, empty/duplicate options, difficulty match.
-- **AI Quality Assurance ("LLM-as-Judge")** — a second, independent Gemini call reviews the *already-generated* quiz for topic relevance, defensible distractors, ambiguity, and explanation consistency — the class of problems no type check can catch.
+The generated quiz passes through two different validation mechanisms.
 
-### 🔁 Self-Healing Retry Loop
+**Programmatic validation** handles deterministic requirements such as:
 
-If either gate fails, the pipeline regenerates automatically (up to 3 attempts) instead of showing the user a broken quiz or a stack trace. Every attempt is logged, producing a transparent, inspectable trail of what was tried and why it passed or failed.
+* question count,
+* duplicate detection,
+* option integrity,
+* empty values,
+* configured difficulty,
+* basic structural consistency.
 
-### 🎛️ Configurable Generation
+**AI quality assurance** handles semantic checks such as:
 
-Topic, target audience (Property Agent / Sales / Marketing / Customer Support / New Employee), question count, difficulty (Beginner / Intermediate / Advanced), and language are all first-class inputs — one pipeline adapts across five roles and two languages without code changes.
+* topic relevance,
+* distractor quality,
+* ambiguity,
+* explanation consistency,
+* factual plausibility.
+
+The important architectural distinction is:
+
+```text
+Code guarantees structure.
+LLM evaluates semantic quality.
+```
+
+Neither mechanism is expected to replace the other.
+
+---
+
+### 🔁 Self-Healing Retry Pipeline
+
+When a quiz fails validation or AI quality review, the pipeline does not immediately expose the failure to the user.
+
+Instead:
+
+```text
+Generation
+    ↓
+Validation / QA
+    ↓
+Failed?
+    ├── No → Continue
+    │
+    └── Yes
+          ↓
+      Log Reason
+          ↓
+      Retry
+          ↓
+     Up to 3 Attempts
+```
+
+Each attempt is recorded so that the generation process remains inspectable.
+
+---
+
+### 🎛️ Configurable Assessment Generation
+
+The interface supports configurable inputs including:
+
+| Input              | Supported Configuration                                          |
+| ------------------ | ---------------------------------------------------------------- |
+| **Topic**          | Free-text property knowledge topic                               |
+| **Target Role**    | Property Agent, Sales, Marketing, Customer Support, New Employee |
+| **Question Count** | User-defined assessment size                                     |
+| **Difficulty**     | Beginner, Intermediate, Advanced                                 |
+| **Language**       | Configurable quiz language                                       |
+
+The same generation pipeline can therefore be reused for different employee groups without changing the underlying application architecture.
+
+---
 
 ### 🎮 Interactive Assessment Experience
 
-The generated quiz isn't dumped as raw text — it's rendered as an actual multiple-choice quiz with per-question inputs, instant scoring, and per-question explanations, built entirely with Streamlit's `session_state` (no separate frontend framework).
+The final output is rendered as an interactive Streamlit application rather than raw generated text.
+
+The user can:
+
+* answer individual questions,
+* submit the assessment,
+* receive an immediate score,
+* inspect per-question results,
+* read explanations,
+* review the generation process through the log panel.
+
+The application uses **Streamlit session state** to preserve quiz interaction across Streamlit reruns.
+
+---
 
 ### 📜 Transparent Generation Log
 
-Every generation attempt — pass or fail, and why — is surfaced in an expandable log panel, turning "the AI just works" into "here is exactly what the AI did and how it corrected itself."
+Every generation attempt can surface:
+
+* attempt number,
+* validation result,
+* AI QA result,
+* failure reason,
+* retry state,
+* final outcome.
+
+This makes the application more transparent than a typical black-box AI interface.
+
+Instead of:
+
+> "The AI generated something."
+
+the system can expose:
+
+> "Attempt 1 failed semantic QA because two distractors were too obviously incorrect. The pipeline regenerated the quiz and passed on Attempt 2."
 
 ---
 
 ## 🧠 AI Workflow
 
 ```text
-Input
- ↓
-Construct Prompt
- ↓
-Generate (Gemini API)
- ↓
-Validate
- ↓
-Review (AI QA)
- ↓
-Retry or Proceed
- ↓
-Present
- ↓
-Score
- ↓
-Explain
+┌───────────────────────┐
+│      USER INPUT       │
+│ Topic / Role / Level  │
+│ Question Count / Lang │
+└───────────┬───────────┘
+            ↓
+┌───────────────────────┐
+│   PROMPT BUILDER      │
+│ Context + Constraints │
+└───────────┬───────────┘
+            ↓
+┌───────────────────────┐
+│     GEMINI API        │
+│ Structured Generation │
+└───────────┬───────────┘
+            ↓
+┌───────────────────────┐
+│ PROGRAMMATIC CHECKS   │
+│ Pydantic + Python     │
+└───────────┬───────────┘
+            ↓
+        Valid?
+       /      \
+     No        Yes
+     ↓          ↓
+   Retry    AI QUALITY
+             REVIEW
+               ↓
+            Pass?
+           /    \
+         No      Yes
+         ↓        ↓
+       Retry   PRESENT
+                  ↓
+               SCORE
+                  ↓
+              EXPLAIN
 ```
 
 ---
 
-## 📐 Design Principles
+## 🏗️ System Architecture
 
-### 1. Fail Loud Internally, Fail Quiet Externally
+### 🖥️ 1. Input Layer
 
-Every validation and QA failure is logged in detail for debugging, but the end user only ever sees a finished quiz or a single clear message — never a stack trace or a malformed question.
+Streamlit provides the user-facing interface for configuring the assessment.
 
-### 2. Separate What the Model Generates from What the Code Guarantees
+Inputs include topic, audience, question count, difficulty, and language.
 
-The LLM owns content quality. Pydantic and plain Python own structural guarantees. Neither is trusted to do the other's job.
+### 🤖 2. Generation Layer
 
-### 3. Two Independent Reviewers, Not One
+The prompt builder transforms user configuration into a structured generation request.
 
-Structural checks and quality checks are deliberately split across two different mechanisms — deterministic code vs. a second LLM call — so they don't share the same blind spots.
+The Gemini client handles communication with the Google Gemini API and structured output configuration.
 
-### 4. Compose Small, Single-Purpose Modules
+### 🛡️ 3. Assurance Layer
 
-Prompt construction, API access, validation, QA, and orchestration each live in their own module, independently readable and testable.
+The assurance layer is where most of the reliability engineering lives:
 
-### 5. Zero Cost by Default
+```text
+Generated Quiz
+     ↓
+Pydantic / Python Validation
+     ↓
+AI Quality Review
+     ↓
+Pass / Retry Decision
+```
 
-Every model call targets Gemini's free tier, and the app deploys on Streamlit Community Cloud's free tier — the whole system runs at $0.
+### 🎮 4. Presentation Layer
+
+A valid quiz is transformed into an interactive assessment containing:
+
+* multiple-choice questions,
+* answer selection,
+* scoring,
+* explanations,
+* generation status.
 
 ---
 
-## 🗂️ Core Components
+## 🧩 Core Components
 
-| Component | Purpose |
-|---|---|
-| 📋 **Prompt Builder** | Turns user input into a constrained generation prompt |
-| 🤖 **Gemini Client** | Handles all communication with the Gemini API, including structured output |
-| 🧩 **Pydantic Schemas** | Define the exact shape of a valid quiz and a valid QA result |
-| ✅ **Programmatic Validator** | Deterministic, zero-cost structural checks |
-| 🧑‍⚖️ **AI QA Checker** | Second LLM call acting as an independent quality reviewer |
-| 🔁 **Quiz Pipeline** | Orchestrates generation → validation → QA → retry |
-| 🎮 **Interactive UI** | Session-state–driven quiz-taking and scoring experience |
+| Component                    | Responsibility                                        |
+| ---------------------------- | ----------------------------------------------------- |
+| 📋 **Prompt Builder**        | Constructs generation prompts from user configuration |
+| 🤖 **Gemini Client**         | Handles API communication and structured generation   |
+| 🧩 **Pydantic Schemas**      | Define the expected shape of generated data           |
+| ✅ **Programmatic Validator** | Performs deterministic structural checks              |
+| 🧑‍⚖️ **AI QA Checker**      | Performs semantic review using a second LLM call      |
+| 🔁 **Quiz Pipeline**         | Orchestrates generation, validation, QA, and retry    |
+| 🎮 **Interactive UI**        | Handles quiz rendering, state, scoring, and feedback  |
 
 ---
 
 ## 🔬 Technical Implementation
 
-### Structured Output via `response_schema`
+### Structured Output
+
+The system uses schema-driven generation rather than relying exclusively on prompt instructions.
 
 ```text
 Pydantic Model
-     ↓
-response_schema (Gemini API)
-     ↓
-Constrained Generation
-     ↓
-response.parsed → typed Python object
+      ↓
+JSON / Schema Definition
+      ↓
+Gemini response_schema
+      ↓
+Structured Response
+      ↓
+Typed Python Object
 ```
 
-### LLM-as-Judge Quality Review
+The architectural advantage is that the application's expected data contract is defined explicitly before content generation takes place.
 
-A second, independently-prompted Gemini call receives the already-generated quiz and is asked to **judge it, not regenerate it**, against five concrete criteria: relevance, distractor defensibility, ambiguity, explanation consistency, and factual plausibility.
+---
 
-### Retry With Backoff
+### LLM-as-Judge
+
+A second Gemini request is used exclusively for **quality review**.
+
+The reviewer receives an already-generated quiz and evaluates it against criteria such as:
+
+| Criterion                   | Question                                                              |
+| --------------------------- | --------------------------------------------------------------------- |
+| **Relevance**               | Does the question actually match the requested topic?                 |
+| **Distractor Quality**      | Are incorrect answers plausible enough to test understanding?         |
+| **Ambiguity**               | Could multiple answers reasonably appear correct?                     |
+| **Explanation Consistency** | Does the explanation match the intended answer?                       |
+| **Factual Plausibility**    | Does the generated content appear logically and factually defensible? |
+
+The reviewer is not responsible for regenerating the quiz. Its role is to **judge quality and return a decision**.
+
+---
+
+### 🔁 Retry Strategy
+
+A failed generation follows a controlled retry path.
 
 ```text
-Attempt fails
-     ↓
-Log the reason
-     ↓
-Short delay (rate-limit friendly)
-     ↓
-Retry (up to 3x)
-     ↓
-Fail gracefully with a clear message
+Attempt 1
+   ↓
+Validation
+   ↓
+AI QA
+   ↓
+Failure
+   ↓
+Reason Logged
+   ↓
+Retry
+   ↓
+Attempt 2
+   ↓
+...
+   ↓
+Maximum 3 Attempts
 ```
+
+This keeps the user experience simple while maintaining observability during generation.
 
 ---
 
 ## 🛡️ Quality Assurance Framework
 
 ```text
-                  QUIZ REQUEST
-                       │
-          ┌────────────┼────────────┐
-          ↓            ↓            ↓
-     Structural     Semantic      Business
-      Validity       Quality        Rules
-   (Pydantic +    (AI QA via     (count, role,
-     Python)        2nd LLM)      difficulty)
-          │            │            │
-          └────────────┼────────────┘
-                       ↓
-                Pass / Retry Decision
-                       ↓
-                Interactive Quiz
+                       QUIZ REQUEST
+                            │
+              ┌─────────────┼─────────────┐
+              ↓             ↓             ↓
+        STRUCTURAL       SEMANTIC     CONFIGURATION
+          CHECKS           QA           RULES
+        Python +        Second LLM    Role / Level /
+        Pydantic         Reviewer      Count / Lang
+              │             │             │
+              └─────────────┼─────────────┘
+                            ↓
+                   PASS / RETRY DECISION
+                            ↓
+                    INTERACTIVE QUIZ
 ```
+
+The key design principle is **defense in depth**: no single validation mechanism is expected to catch every possible failure mode.
 
 ---
 
 ## 🧪 Testing & Iteration
 
-The pipeline's own retry/validation loop functions as a form of **continuous, automated testing at runtime** — every single generation is checked against the same criteria a human reviewer would use, not just once during development.
+During development, the application was manually exercised against multiple property-industry topics, including:
 
-During development, the pipeline was exercised manually against multiple real property-industry topics — including *Property Market Updates in Jakarta*, *Basic KPR Knowledge*, and *Top Skills of a Property Agent* — across different roles, difficulty levels, and languages, to confirm the generate → validate → QA → retry cycle behaves correctly end-to-end.
+* **Property Market Updates in Jakarta**
+* **Basic KPR Knowledge**
+* **Top Skills of a Property Agent**
 
-> Honesty note: this section intentionally avoids invented metrics. See **Known Limitations** below for a candid account of what the current system does *not* yet guarantee.
+These scenarios were tested across different roles, difficulty levels, and languages to verify the end-to-end behavior of:
+
+```text
+Generate
+   ↓
+Validate
+   ↓
+Review
+   ↓
+Retry if Needed
+   ↓
+Present
+   ↓
+Score
+```
+
+The runtime validation and retry loop provides **automated quality control for each generation**.
+
+It should not, however, be described as a substitute for a comprehensive offline test suite or a formal benchmark.
+
+> **Honesty note:** this project intentionally does not claim a numerical accuracy or hallucination rate without a controlled evaluation dataset.
 
 ---
 
@@ -227,95 +463,92 @@ During development, the pipeline was exercised manually against multiple real pr
 ```text
 Topic
   ↓
+User Configuration
+  ↓
 Structured Prompt
   ↓
 Constrained Generation
   ↓
-Automated Review
+Programmatic Validation
+  ↓
+AI Quality Review
   ↓
 Verified Quiz
   ↓
 Human Interaction
   ↓
-Instant Feedback
+Automatic Scoring
   ↓
-Retained Knowledge
+Instant Feedback
 ```
+
+The important transformation is:
+
+> **Unstructured user intent → validated assessment artifact**
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| 🖥️ **Interface** | Streamlit | Single-language UI + backend, no separate frontend |
-| 🧠 **Generation** | Google Gemini API (`gemini-2.5-flash`) | Quiz content generation with structured output |
-| 📦 **SDK** | `google-genai` | Official Python client for the Gemini API |
-| 🧩 **Validation** | Pydantic | Schema definition, type enforcement, structured parsing |
-| 🔐 **Config** | `python-dotenv` | Local secret management via `.env` |
-| 🗂️ **Version Control** | Git + GitHub | Source control, public repository |
-| ☁️ **Deployment** | Streamlit Community Cloud | Free public hosting |
+| Layer                   | Technology                | Role                                          |
+| ----------------------- | ------------------------- | --------------------------------------------- |
+| 🖥️ **Application**     | Streamlit                 | UI, state management, and application runtime |
+| 🧠 **LLM**              | Google Gemini API         | Quiz generation and semantic quality review   |
+| 📦 **Model**            | `gemini-2.5-flash`        | Structured generation and QA                  |
+| 🧩 **Validation**       | Pydantic                  | Schema definition and type validation         |
+| 🐍 **Language**         | Python                    | Application and orchestration logic           |
+| 🔐 **Configuration**    | `python-dotenv`           | Environment variable management               |
+| 🗂️ **Version Control** | Git + GitHub              | Source control and project history            |
+| ☁️ **Deployment**       | Streamlit Community Cloud | Public application hosting                    |
 
 ---
 
-## 🖥️ System Architecture
-
-### 📥 Input Layer
-
-The Streamlit form collecting topic, role, question count, difficulty, and language.
-
-### 🤖 Generation Layer
-
-Prompt construction and schema-constrained generation via the Gemini API.
-
-### 🛡️ Assurance Layer
-
-Programmatic validation, AI-based quality review, and the retry loop that ties them together.
-
-### 🎮 Presentation Layer
-
-The interactive quiz UI, scoring logic, and feedback display.
+## 🗂️ Repository Structure
 
 ```text
-┌────────────────────────┐
-│      INPUT LAYER       │
-│   Streamlit Form (UI)  │
-└────────────┬───────────┘
-             ↓
-┌────────────────────────┐
-│    GENERATION LAYER    │
-│  Prompt Builder + Gemini│
-│   (Structured Output)  │
-└────────────┬───────────┘
-             ↓
-┌────────────────────────┐
-│    ASSURANCE LAYER     │
-│ Programmatic Validation │
-│   + AI QA + Retry Loop │
-└────────────┬───────────┘
-             ↓
-┌────────────────────────┐
-│   PRESENTATION LAYER   │
-│  Interactive Quiz UI   │
-│   Scoring + Feedback   │
-└────────────────────────┘
+99group-quiz-generator/
+│
+├── app.py
+├── requirements.txt
+├── .gitignore
+├── .env.example
+│
+├── prompts/
+│   └── quiz_generation_prompt.md
+│
+├── src/
+│   ├── schemas.py
+│   ├── prompt_builder.py
+│   ├── gemini_client.py
+│   ├── validation.py
+│   ├── qa_checker.py
+│   └── quiz_pipeline.py
+│
+├── examples/
+│
+├── docs/
+│
+└── LICENSE
 ```
+
+The intended architecture keeps **generation, validation, AI review, and orchestration separate**, making individual components easier to inspect and test.
 
 ---
 
 ## 🗺️ Project Scope
 
-| Module | Description | Status |
-|---|---|---|
-| 🎛️ Configurable Input | Topic, role, count, difficulty, language | ✅ Implemented |
-| 🤖 AI Generation | Structured quiz generation via Gemini API | ✅ Implemented |
-| ✅ Programmatic Validation | Count, duplicates, empty/duplicate options, difficulty match | ✅ Implemented |
-| 🧑‍⚖️ AI Quality Assurance | LLM-as-judge review of relevance & fairness | ✅ Implemented |
-| 🔁 Retry / Regeneration | Automatic recovery on validation/QA failure | ✅ Implemented |
-| 🎮 Interactive Quiz | Session-state–driven quiz-taking UI | ✅ Implemented |
-| 🧮 Automatic Scoring | Instant scoring with per-question explanations | ✅ Implemented |
-| 📜 Generation Log | Attempt-by-attempt audit trail | ✅ Implemented |
-| ☁️ Public Deployment | Live demo on Streamlit Community Cloud | ✅ Implemented |
+| Capability                                            | Status                                           |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| 🎛️ Configurable topic / role / difficulty / language | ✅ Implemented                                    |
+| 🤖 Structured AI quiz generation                      | ✅ Implemented                                    |
+| 🧩 Pydantic schema validation                         | ✅ Implemented                                    |
+| ✅ Programmatic validation                             | ✅ Implemented                                    |
+| 🧑‍⚖️ AI quality review                               | ✅ Implemented                                    |
+| 🔁 Automatic retry                                    | ✅ Implemented                                    |
+| 🎮 Interactive quiz interface                         | ✅ Implemented                                    |
+| 🧮 Automatic scoring                                  | ✅ Implemented                                    |
+| 📜 Generation log                                     | ✅ Implemented                                    |
+| ☁️ Streamlit deployment                               | 🚧 Deployment status depends on live environment |
 
 ---
 
@@ -327,151 +560,178 @@ The interactive quiz UI, scoring logic, and feedback display.
 
 <p><strong>🧠 99 Group AI Property Knowledge Quiz Builder</strong></p>
 
-<p><a href="https://employee-quiz-builder-kdgdcd9rlvphaws8zspuu9.streamlit.app/"><strong>► View Live Demo</strong></a></p>
+<p>
+<a href="https://your-app-name.streamlit.app">
+<strong>► View Live Application</strong>
+</a>
+</p>
 
 </div>
 
+> Replace the URL above with the actual Streamlit Community Cloud deployment before publishing.
+
 ### 📸 Preview
 
-![Screenshot 1](images/Picture1.png)
-![Screenshot 2](images/Picture2.png)
-![Screenshot 3](images/Picture3.png)
-![Screenshot 4](images/Picture4.png)
-![Screenshot 5](images/Picture5.png)
-![Screenshot 6](images/Picture6.png)
-![Screenshot 7](images/Picture7.png)
+![Quiz Builder Preview](images/quiz-builder-preview.png)
 
-*Topic input, AI-generated quiz, and instant scoring — all in one interactive Streamlit session.*
-
----
-
-## 📂 Repository Structure
-
-```text
-99group-quiz-generator/
-├── app.py
-├── requirements.txt
-├── .gitignore
-├── .env.example
-├── prompts/
-│   └── quiz_generation_prompt.md
-├── src/
-│   ├── schemas.py
-│   ├── prompt_builder.py
-│   ├── gemini_client.py
-│   ├── validation.py
-│   ├── qa_checker.py
-│   └── quiz_pipeline.py
-├── examples/
-└── docs/
-```
+*Topic configuration, AI-generated assessment, scoring, and feedback within a single Streamlit application.*
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Clone & Install
+### 1. Clone the Repository
 
 ```text
 git clone https://github.com/<your-username>/99group-quiz-generator.git
 cd 99group-quiz-generator
+```
+
+### 2. Create a Virtual Environment
+
+```text
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
+```
+
+Activate it:
+
+```text
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install Dependencies
+
+```text
 pip install -r requirements.txt
 ```
 
-### 2. Configure Your API Key
+### 4. Configure the API Key
+
+Copy the example environment file:
 
 ```text
 cp .env.example .env
 ```
 
-Then edit `.env`:
+Then add your Gemini API key:
 
 ```text
 GEMINI_API_KEY=your_api_key_here
 ```
 
-Get a free key at [Google AI Studio](https://aistudio.google.com/apikey) — no credit card required.
+Do not commit `.env` or any secret credentials to the repository.
 
-### 3. Run Locally
+### 5. Run the Application
 
 ```text
 streamlit run app.py
 ```
 
+The application will then be available through the local Streamlit server.
+
 ---
 
 ## 💼 Portfolio Alignment
 
-| Skill | Evidence in This Project |
-|---|---|
-| LLM application engineering | Full generate → validate → QA → retry pipeline, not a single prompt call |
-| Structured / constrained generation | `response_schema` + Pydantic instead of hoping the JSON parses |
-| LLM-as-judge pattern | Independent second model call used purely for quality review |
-| Defensive software design | Deterministic validation decoupled from AI judgment |
-| Python application architecture | Clean module separation (`schemas`, `prompt_builder`, `gemini_client`, `validation`, `qa_checker`, `pipeline`) |
-| Stateful UI development | Streamlit `session_state` used correctly across reruns |
-| Cost-conscious engineering | Entire stack runs on free-tier APIs and free-tier hosting |
-| Documentation | Prompt templates and workflow versioned alongside the code, not screenshotted |
+| Skill                           | Demonstrated Through                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------- |
+| **LLM Application Engineering** | Multi-stage generation, validation, review, and retry pipeline                        |
+| **Structured Generation**       | Gemini structured output + Pydantic schemas                                           |
+| **LLM-as-Judge**                | Independent second model call for semantic quality review                             |
+| **Defensive Programming**       | Deterministic validation before AI assessment                                         |
+| **Python Architecture**         | Separated schema, prompt, API, validation, QA, and pipeline modules                   |
+| **Stateful UI Development**     | Streamlit `session_state` for multi-step quiz interaction                             |
+| **Prompt Engineering**          | Structured prompts with explicit context and constraints                              |
+| **Error Handling**              | Controlled retry loop with graceful failure behavior                                  |
+| **Cost-Aware Engineering**      | Free-tier oriented architecture                                                       |
+| **Technical Documentation**     | Architecture, limitations, workflow, and implementation documented alongside the code |
 
-> **Portfolio positioning:** this project demonstrates the ability to wrap a non-deterministic model in genuine engineering discipline — not just call an API and hope for the best.
-
----
-
-### 🧬 Schema-Constrained Generation
-
-Quiz generation uses the Gemini API's `response_schema` parameter
-bound to Pydantic models. This moves the output contract into the
-generation layer, so the application receives a structured response
-that conforms to the defined schema instead of relying on free-form
-LLM text followed by manual JSON parsing.
-
----
-
-## 🧾 Prompt Engineering & Reproducibility
-
-The repository documents the AI layer as part of the engineering implementation rather than treating prompts as hidden application details.
-
-The public project includes:
-
-* the generation prompt template,
-* the AI quality-review prompt,
-* the expected structured output schema,
-* the reasoning behind the separation between generation and evaluation.
-
-The generation prompt is responsible for producing the quiz.
-
-The review prompt is intentionally separated and used only to evaluate the already-generated quiz against explicit quality criteria.
-
-This separation makes the AI workflow easier to inspect, reproduce, debug, and iterate without coupling content generation directly to its own evaluation.
+> **Portfolio positioning:** the main engineering challenge is not making an LLM generate questions. It is designing the surrounding system so that a non-deterministic model becomes part of a predictable application workflow.
 
 ---
 
 ## ⚠️ Known Limitations
 
-- Retry is capped at 3 attempts; a persistently malformed generation still surfaces as a clear failure rather than forcing success.
-- No persistent storage — quiz state resets on page refresh or new session.
-- Gemini's free-tier rate limits can be reached if many quizzes are generated back-to-back in quick succession.
-- Difficulty and role are taken at face value from the prompt; there is no independent calibration of what "Beginner" means across different topics.
+The current implementation has several intentional limitations.
+
+### No Persistent Quiz Storage
+
+Quiz state is session-based and can be lost when the application is refreshed or the session ends.
+
+### Runtime Validation Is Not a Formal Benchmark
+
+The validation and AI QA layers improve generation reliability, but they do not establish a statistically measured accuracy rate or guarantee factual correctness.
+
+### LLM Judgment Can Still Be Imperfect
+
+The AI reviewer is another probabilistic model. It can identify semantic problems that code cannot, but it can also miss subtle issues or make an incorrect judgment.
+
+### Difficulty Is Prompt-Driven
+
+`Beginner`, `Intermediate`, and `Advanced` are treated as generation constraints rather than empirically calibrated difficulty levels.
+
+### Free-Tier Constraints
+
+High-frequency generation can encounter provider rate limits or other free-tier restrictions.
 
 ---
 
 ## 🔭 Future Development
 
-- Persist quiz history per user/session.
-- Export generated quizzes to PDF/Word for offline use.
-- Add an aggregated results view across employees.
-- Dynamically-sized schemas to enforce exact question count at the API level, not just after the fact.
-- Adopt newer/cheaper Gemini model tiers as they become available.
+Potential extensions include:
+
+* Persistent quiz history
+* Employee-level assessment tracking
+* Aggregate performance dashboards
+* PDF and Word export
+* Question bank storage
+* Retrieval-augmented generation using internal training material
+* Evaluation datasets for measurable quality benchmarking
+* Automated regression testing for prompt and model changes
+* Adaptive difficulty based on historical performance
+* More granular model-based scoring and confidence estimation
+
+A particularly valuable future step would be establishing a **fixed evaluation dataset** so that prompt, model, and validation changes can be compared quantitatively instead of relying only on manual inspection.
+
+---
+
+## 🧠 Key Engineering Takeaways
+
+This project demonstrates several principles relevant to production-oriented LLM applications:
+
+### 1. Let Code Guarantee What Code Can Guarantee
+
+Schema validation, required fields, duplicates, and structural consistency should not depend entirely on model instructions.
+
+### 2. Use the LLM Where Semantic Judgment Is Required
+
+Relevance, ambiguity, distractor quality, and explanation consistency are much harder to validate with simple deterministic rules.
+
+### 3. Separate Generation From Evaluation
+
+Asking one model call to generate and self-certify its own output creates unnecessary blind spots. A separate QA stage creates a clearer quality boundary.
+
+### 4. Build Recovery Into the Pipeline
+
+A model failure should be treated as an expected operational condition, not an exceptional event that crashes the entire application.
+
+### 5. Measure Before Making Strong Claims
+
+Without a benchmark dataset, claims such as "95% accurate" or "hallucination-free" would be misleading. This project therefore focuses on architecture and observable validation behavior rather than invented performance numbers.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE) for the full text.
+This project is licensed under the **MIT License**.
 
-> Add a `LICENSE` file at the root of the repository if it isn't there yet — GitHub's "Add file → Create new file → LICENSE" template picker makes this a one-minute task.
+See [`LICENSE`](LICENSE) for the full license text.
+
+The MIT License permits reuse, modification, and distribution subject to the conditions stated in the license.
 
 ---
 
@@ -482,7 +742,7 @@ This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE) 
 <p>
 👨‍💻 <strong>Bernardo Nandaniar Sunia</strong><br/>
 Data Analyst · Bachelor of Computer Science<br/>
-Diponegoro University
+Python · Data Analytics · LLM Applications · NLP
 </p>
 
 <p>
@@ -510,6 +770,24 @@ Diponegoro University
 
 ## 📌 Conclusion
 
-This project demonstrates how a large language model can be wrapped in genuine software engineering discipline — schema-constrained generation, independent structural and semantic quality gates, automatic recovery from failure, and a clean, testable module boundary — to produce something more trustworthy than a single prompt-and-hope call to an API.
+The core lesson of this project is simple:
 
-The point is not to prove that an LLM *can* generate a quiz — any single API call can do that. The point is to prove that it can do so **reliably**, with the same validation, error-handling, and quality assurance expected of any production system, wrapped around a model that is, by nature, non-deterministic.
+> **The difficult part of an LLM application is not generating text. It is building the system around the model so that the generated result becomes useful, validated, recoverable, and observable.**
+
+Property Knowledge Quiz Builder applies that principle through:
+
+```text
+Structured Generation
+        +
+Deterministic Validation
+        +
+Independent AI Quality Review
+        +
+Automatic Retry
+        +
+Interactive Delivery
+        =
+More Reliable LLM Application
+```
+
+The application therefore serves as more than a quiz generator. It is a practical example of how **software engineering discipline can be applied around a probabilistic model** to create a more controlled and maintainable AI workflow.
