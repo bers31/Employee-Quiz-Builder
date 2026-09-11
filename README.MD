@@ -477,27 +477,32 @@ This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE) 
 
 <div class="contact-hero">
 
-<p><strong>Interested in this project?</strong></p>
+<p><strong>Interested in the engineering behind this project?</strong></p>
 
 <p>
-👨‍💻 <strong>[Your Name]</strong><br/>
-[Your Title — e.g. Software Engineer / AI Enthusiast]<br/>
-Python · LLM Engineering · AI Workflow Design
+👨‍💻 <strong>Bernardo Nandaniar Sunia</strong><br/>
+Data Analyst · Bachelor of Computer Science<br/>
+Diponegoro University
 </p>
 
 <p>
-<a href="[Your LinkedIn URL]">
+<a href="https://linkedin.com/in/bernardo-sunia/">
 <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
 </a>
-<a href="mailto:[your_email@example.com]">
+<a href="mailto:suniabernardo@gmail.com">
 <img src="https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email">
 </a>
-<a href="https://github.com/[your-github-username]">
+<a href="https://github.com/bers31">
 <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+</a>
+<a href="https://bit.ly/bernardo-my_portfolio">
+<img src="https://img.shields.io/badge/Portfolio-255E63?style=for-the-badge&logo=About.me&logoColor=white" alt="Portfolio">
 </a>
 </p>
 
-<p><em>Python · Streamlit · Google Gemini API · LLM Application Engineering</em></p>
+<p>
+<em>Python · Streamlit · Google Gemini API · Pydantic · LLM Application Engineering</em>
+</p>
 
 </div>
 
