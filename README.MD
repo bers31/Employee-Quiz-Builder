@@ -1,6 +1,6 @@
 <div class="hero">
 
-<h1>🧠 99 Group AI Property Knowledge Quiz Builder</h1>
+<h1>🧠 Property Knowledge Quiz Builder</h1>
 
 <p>AI Quiz Generation · LLM-as-Judge Quality Gate · Interactive Assessment</p>
 
